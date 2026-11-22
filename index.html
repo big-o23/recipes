@@ -35,6 +35,10 @@ input,select,textarea{background:var(--surface);border:1px solid var(--border);b
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
 .card:hover{border-color:var(--accent)}
+.card h3{cursor:pointer}
+.card h3::before{content:"▸ ";color:var(--muted)}
+.card.open{grid-column:1/-1;cursor:default}
+.card.open h3::before{content:"▾ "}
 .card h3{margin:0;font-size:1.15rem}
 .stars{color:var(--star);letter-spacing:2px;font-size:1.05rem}
 .meta{color:var(--muted);font-family:system-ui,sans-serif;font-size:.85rem}
@@ -75,6 +79,7 @@ a{color:var(--accent)}
     <select id="fmin"><option value="">Any score</option><option value="3">★3 and up</option><option value="4">★4 and up</option><option value="5">★5 only</option></select>
   </div>
   <div class="chips" id="chips"></div>
+  <div class="row" style="margin:-6px 0 14px"><button class="btn" id="expall">Expand all</button><button class="btn" id="colall">Collapse all</button></div>
   <div class="grid" id="grid"></div>
   <div class="row" style="margin-top:28px">
     <button class="btn" id="export">Export backup</button>
@@ -167,6 +172,26 @@ a{color:var(--accent)}
     });
   }
 
+  var openIds={};
+  function buildDetail(c,r){
+    var d=el("div","detail");
+    if(/^https?:\/\//i.test(r.source)){
+      var p=el("p");var a=el("a",null,r.source);a.href=r.source;a.target="_blank";a.rel="noopener noreferrer";
+      p.appendChild(a);d.appendChild(p);
+    }
+    [["Ingredients",r.ingredients],["Instructions",r.steps],["Notes",r.notes]].forEach(function(x){
+      if(x[1]){d.appendChild(el("h4",null,x[0]));d.appendChild(el("pre",null,x[1]))}
+    });
+    var row=el("div","row");
+    var e=el("button","btn","Edit");e.onclick=function(){openEdit(r.id)};
+    var del=el("button","btn danger","Delete");
+    del.onclick=function(){
+      if(del.dataset.sure){recipes=recipes.filter(function(x){return x.id!==r.id});delete openIds[r.id];persist();render()}
+      else{del.dataset.sure="1";del.textContent="Tap again to confirm"}
+    };
+    row.appendChild(e);row.appendChild(del);d.appendChild(row);c.appendChild(d);
+  }
+
   function render(){
     var sort=$("sort").value;
     fill("fcat","All categories",used("category"));
@@ -201,7 +226,7 @@ a{color:var(--accent)}
     grid.style.display="";
     list.forEach(function(r){
       var c=el("div","card");
-      c.appendChild(el("h3",null,r.title));
+      var h3=el("h3",null,r.title);c.appendChild(h3);
       c.appendChild(el("div","stars",starStr(r.rating)));
       var cm=[r.category,r.protein].filter(Boolean).join(" · ");
       if(cm)c.appendChild(el("div","meta",cm));
@@ -211,7 +236,10 @@ a{color:var(--accent)}
         r.tags.forEach(function(x){t.appendChild(el("span",null,x))});
         c.appendChild(t);
       }
-      c.onclick=function(){openView(r.id)};
+      var isOpen=!!openIds[r.id];
+      var tog=function(){if(openIds[r.id])delete openIds[r.id];else openIds[r.id]=1;render()};
+      if(isOpen){c.className="card open";h3.onclick=tog;buildDetail(c,r)}
+      else c.onclick=tog;
       grid.appendChild(c);
     });
   }
@@ -290,6 +318,8 @@ a{color:var(--accent)}
     lastPick=p.id;openView(p.id,true);
   }
   $("inspire").onclick=inspire;
+  $("expall").onclick=function(){filtered().forEach(function(r){openIds[r.id]=1});render()};
+  $("colall").onclick=function(){openIds={};render()};
   $("add").onclick=function(){openEdit()};
   $("cancel").onclick=function(){$("edit").close()};
   $("save").onclick=function(){
